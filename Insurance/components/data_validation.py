@@ -1,57 +1,61 @@
-# 1. data type
-# 2. unwanted data finding
-# 3. data cleaning
-
-
-from cgi import test
-import sys
-from Insurance.config import TARGET_COLUMN
-from Insurance.entity import config_entity, artifact_entity
-from Insurance.exception import InsuranceException
-import os
+from Insurance.entity import artifact_entity,config_entity
 from Insurance.exception import InsuranceException
 from Insurance.logger import logging
-import pandas as pd
-from typing import Optional
 from scipy.stats import ks_2samp
+from typing import Optional
+import os,sys 
+import pandas as pd
+from Insurance import utils
 import numpy as np
 from Insurance.config import TARGET_COLUMN
-from Insurance import utils
+
+
+
 
 class DataValidation:
-    def __init__(self, 
-                    data_validation_config: config_entity.DataValidationConfig,
-                    data_ingestion_artifact: artifact_entity.DataIngestionArtifact):
+
+
+    def __init__(self,
+                    data_validation_config:config_entity.DataValidationConfig,
+                    data_ingestion_artifact:artifact_entity.DataIngestionArtifact):
         try:
-            logging.info(f"************Data Validation************")
+            logging.info(f"{'>>'*20} Data Validation {'<<'*20}")
             self.data_validation_config = data_validation_config
-            self.data_ingestion_artifact = data_ingestion_artifact
-            self.validation_error = dict()
-
-
+            self.data_ingestion_artifact=data_ingestion_artifact
+            self.validation_error=dict()
         except Exception as e:
-                raise InsuranceException(e, sys)
-        
-
-        
-
-    def drop_missing_values_columns(self, df:pd.DataFrame, report_key_name:str)->Optional[pd.DataFrame]:
-         try:
-              threshold = self.data_validation_config.missing_threshold
-              null_report = df.isnull().sum() / df.shape[0]
-              drop_columns_names = null_report[null_report > threshold].index
-
-              self.validation_error[report_key_name] = list(drop_columns_names)
-              df.drop(list(drop_columns_names), axis=1, inplace=True)
-
-              if len(df.columns) == 0:
-                   return None
-              return df
-         except Exception as e:
             raise InsuranceException(e, sys)
-              
+        
+    
 
+    def drop_missing_values_columns(self,df:pd.DataFrame,report_key_name:str)->Optional[pd.DataFrame]:
+        """
+        This function will drop column which contains missing value more than specified threshold
 
+        df: Accepts a pandas dataframe
+        threshold: Percentage criteria to drop a column
+        =====================================================================================
+        returns Pandas DataFrame if atleast a single column is available after missing columns drop else None
+        """
+        try:
+            
+            threshold = self.data_validation_config.missing_threshold
+            null_report = df.isna().sum()/df.shape[0]
+            #selecting column name which contains null
+            logging.info(f"selecting column name which contains null above to {threshold}")
+            drop_column_names = null_report[null_report>threshold].index
+
+            logging.info(f"Columns to drop: {list(drop_column_names)}")
+            self.validation_error[report_key_name]=list(drop_column_names)
+            df.drop(list(drop_column_names),axis=1,inplace=True)
+
+            #return None no columns left
+            if len(df.columns)==0:
+                return None
+            return df
+        except Exception as e:
+            raise InsuranceException(e, sys)
+    #     print("dsgfg")
     def is_required_columns_exists(self,base_df:pd.DataFrame,current_df:pd.DataFrame,report_key_name:str)->bool:
         try:
            
@@ -68,10 +72,9 @@ class DataValidation:
                 self.validation_error[report_key_name]=missing_columns
                 return False
             return True
-        
         except Exception as e:
-            raise InsuranceException(e, sys)  
-              
+            raise InsuranceException(e, sys)
+
     def data_drift(self,base_df:pd.DataFrame,current_df:pd.DataFrame,report_key_name:str):
         try:
             drift_report=dict()
@@ -100,9 +103,8 @@ class DataValidation:
                     #different distribution
 
             self.validation_error[report_key_name]=drift_report
-
         except Exception as e:
-            raise InsuranceException(e, sys)  
+            raise InsuranceException(e, sys)
 
     def initiate_data_validation(self)->artifact_entity.DataValidationArtifact:
         try:
